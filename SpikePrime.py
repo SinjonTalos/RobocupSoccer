@@ -25,34 +25,51 @@ class Motor(Device):
         self.robot.hub.sleep()
         self.robot.moveMotor(self.id,0)
 
+# MotionSensor class for Spike Prime robot 
 class MotionSensor:
     def __init__(self,robot):
         self.robot = robot
         self.Yaw = 0.0
 
-    def getYaw(self):
+    # yaw angle in degrees
+    def getYaw(self) -> float:
         self.robot.hub.sleep()
         return  -(self.robot.APz / pi * 180 ) #% 360.0)
     
+    # reset yaw angle to zero
     def reset_yaw_angle(self):
         self.robot.hub.sleep()
         self.Yaw = self.getYaw()
 
+    # yaw angle in degrees since last reset of yaw angle
     def get_yaw_angle(self) -> float:
         return self.getYaw() - self.Yaw
 
+#class to emulate disctance sensor for Spike Prime robot
+class DistanceSensor(Device):
+    def __init__(self,robot):
+        Device.__init__(self, robot)
+        self.distance = 0.0
+
+    def getDistance(self) -> float:
+        self.robot.hub.sleep()
+        return self.distance
+
+# IRSeeker class for Spike Prime robot
 class IRSeeker(Device):
     def __init__(self,robot):
         Device.__init__(self, robot)
         self.ball = None  # the ball the seeker is tracking
 
+    # seek the ball
     def seekBall(self,ball):
         self.ball = ball       
 
     def mode(self,a,b):
         return
-    
-    def getSector(self):
+
+    # return the direction to the ball    
+    def getSector(self) -> int:
         self.robot.hub.sleep()
         dx = self.ball.Px - self.robot.Px
         dy = self.ball.Py  - self.robot.Py
@@ -62,7 +79,8 @@ class IRSeeker(Device):
             angle += 360
         return int(angle/30+0.5)
 
-    def getStrength(self):
+    # return the strength of the signal
+    def getStrength(self) -> float:
         self.robot.hub.sleep()
         dx = self.ball.Px - self.robot.Px
         dy = self.ball.Py  - self.robot.Py
@@ -80,6 +98,7 @@ class IRSeeker(Device):
             str = ( hd / (d-r0) ) * str30cm
         return str
     
+    # return the sector and strength of the signal
     def get(self):
         return (self.getSector(),0,self.getStrength())
 
@@ -89,6 +108,7 @@ class Port:
         self.portName = portName
         self.device = None
 
+    # connect the device to the port
     def connect(self, device):
         self.device = device
 
@@ -111,7 +131,7 @@ class DummyDevice:
         return
     def off(self):
         return
-
+    
 class Hub:
     def __init__(self,robot):
         self.port = Ports(self)
@@ -126,6 +146,7 @@ class Hub:
         self.port.D.connect(Motor(robot,4))
 
         self.port.E.connect(IRSeeker(robot))
+        self.port.F.connect(DistanceSensor(robot))
 
         self.motion_sensor = MotionSensor(robot)
 
@@ -136,12 +157,14 @@ class Hub:
 
         self.clock =  500 # specify clock on Hz
 
+    # sleep for 1/clock seconds
     def sleep(self):
         time.sleep(1/self.clock)
 
     def getIRSeeker(self):
         return self.port.E.device
 
+    # get motor connected to port str
     def Motor(self, str) -> Motor:
         if str=="A":
             return self.port.A.device

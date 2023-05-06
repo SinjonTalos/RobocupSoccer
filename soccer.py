@@ -24,15 +24,16 @@ from direct.showbase.ShowBase import ShowBase
 from direct.gui.OnscreenText import OnscreenText
 
 # can be 2 or 4
-NUMBER_ROBOT=4
+NUMBER_ROBOT=2
 REALTIME=True
 DT=0.01  #ignored if real time
 
 class World(DirectObject, myShader):
     def __init__(self,base):
         myShader.__init__(self)
-        self.title = OnscreenText(  # Create the title
-            text="Soccer Sim",
+        
+        self.score = OnscreenText(  # Create the title
+            text="Score 0:0",
             parent=base.a2dBottomRight, align=TextNode.A_right,
             style=1, fg=(0, 0, 0, 1), pos=(-0.1, 0.1), scale=.07)
 
@@ -106,7 +107,7 @@ class World(DirectObject, myShader):
         self.it=0
         self.Bscore = 0
         self.Ascore = 0
-        taskMgr.add(self.runSim, "RunSimTask")
+        taskMgr.add(self.run_sim, "RunSimTask")
 
         # not thread safe, but as long as no Panda3D function is called in the Robot thread...
         # The only variable changed in thread is the torque applied to wheels of robots
@@ -130,8 +131,9 @@ class World(DirectObject, myShader):
         d3 = random.randrange(-50, 50)/100*1.0
         d4 = random.randrange(-50, 50)/100*1.0
         start = str
+        # if str is "random", then randomize the position of robots
         if (str=="random"):
-            start="B Starts" # not so random...
+            start = random.choice(("A Starts","B Starts"))  
 
         if (start=="A Starts"):
             self.Robot1TeamA.setPos(-self.Robot1TeamA.radius*200-self.ball.radius*200,d1)
@@ -164,8 +166,8 @@ class World(DirectObject, myShader):
                 self.Robot1TeamA.setPos(-91.5+30,d2)
                 self.Robot1TeamA.setAzimuth(-90+d1)
 
-
-    def runSim(self, task):
+    # run the simulation for a time dt
+    def run_sim(self, task):
 
         n = 10
         if REALTIME: # Realtime should be rdt = ~ 1/60s (refresh rate) 
@@ -182,50 +184,55 @@ class World(DirectObject, myShader):
         n = max(math.ceil(rdt/mindt),1)
         dt = rdt/n
         for i in range(0,n):
-            self.ball.resetForce()
-            for rb in self.robots:
-                rb.resetForce()
-                rb.resetTorque()
-
-            for rb in self.robotsA:
-                for rb2 in self.robotsB:
-                        rb.collideWith(rb2)
-            if (NUMBER_ROBOT>2):
-                self.Robot1TeamA.collideWith(self.Robot2TeamA)
-                self.Robot1TeamB.collideWith(self.Robot2TeamB)
-
-            for rb in self.robots:
-                self.ball.collideWith(rb)
-                for wl in self.walls:
-                    wl.collideWith(rb)
-
-            for wl in self.walls:
-                wl.collideWith(self.ball)
-
-            for rb in self.robots:
-                rb.update(dt)
-            self.ball.update(dt)
-
-            if self.goalA.isInside(self.ball):
-                self.ball.reset(0.0)
-                for rb in self.robots:
-                    rb.reset()
-                self.resetRobots("B Starts")
-                self.Bscore = self.Bscore + 1
-            if self.goalB.isInside(self.ball):
-                self.ball.reset(0.0)
-                for rb in self.robots:
-                    rb.reset()
-                self.resetRobots("A Starts")
-                self.Ascore = self.Ascore + 1
-
-            self.title.text = "Score " + str(self.Bscore) + ":" + str(self.Ascore)
-            self.updatePositions()
+            self.run_step(dt)
 
         base.trackball.node().set_pos(0-self.ball.Px*50.0, 180 - self.ball.Py*50.0 , 20 - self.ball.Py*25.0)
         return Task.cont
 
-    def createRobot(self, robot, cNode):
+    # run one step of the simulation
+    def run_step(self, dt):
+        self.ball.resetForce()
+        for rb in self.robots:
+            rb.resetForce()
+            rb.resetTorque()
+
+        for rb in self.robotsA:
+            for rb2 in self.robotsB:
+                    rb.collideWith(rb2)
+        if (NUMBER_ROBOT>2):
+            self.Robot1TeamA.collideWith(self.Robot2TeamA)
+            self.Robot1TeamB.collideWith(self.Robot2TeamB)
+
+        for rb in self.robots:
+            self.ball.collideWith(rb)
+            for wl in self.walls:
+                wl.collideWith(rb)
+
+        for wl in self.walls:
+            wl.collideWith(self.ball)
+
+        for rb in self.robots:
+            rb.update(dt)
+        self.ball.update(dt)
+
+        if self.goalA.isInside(self.ball):
+            self.ball.reset(0.0)
+            for rb in self.robots:
+                rb.reset()
+            self.resetRobots("B Starts")
+            self.Bscore = self.Bscore + 1
+        if self.goalB.isInside(self.ball):
+            self.ball.reset(0.0)
+            for rb in self.robots:
+                rb.reset()
+            self.resetRobots("A Starts")
+            self.Ascore = self.Ascore + 1
+
+        self.score.text = "Score " + str(self.Bscore) + ":" + str(self.Ascore)
+        self.updatePositions()
+
+    # create robog
+    def createRobot(self, robot):
 
         robot.node.setP(-90)
         body = loader.loadModel("models/Robot")
@@ -256,6 +263,7 @@ class World(DirectObject, myShader):
             w.node.setH(-90.0)
             w.node.setP(45.0)
 
+        # set the wheels positions
         robot.wheels[0].node.setPos(-4.0,0.0,-4.0)
         robot.wheels[0].node.setH(-90.0)
         robot.wheels[0].node.setP(45.0)
@@ -350,8 +358,7 @@ class World(DirectObject, myShader):
         for rb in self.robots:
             rb.node = NodePath(rb.name)
             rb.node.reparentTo(self.scene)
-            cn = CollisionNode(rb.name)
-            self.createRobot(rb,cn)
+            self.createRobot(rb)
 
         self.ball.node = loader.loadModel("models/Sphere")
         self.ball.node.setTexture(tsb, black_tex)

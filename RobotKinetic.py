@@ -6,6 +6,7 @@ from shader import *
 from stdfunction import *
 from SpikePrime import *
 
+# Wall class, infinite static wall robot can collide with
 class Wall:
     def __init__(self, x0, y0, dx, dy):
         self.x0 = x0 
@@ -15,6 +16,7 @@ class Wall:
         self.dy = dy / self.l
         self.K = 1000.0
 
+    # check if object collides with wall and add force to object
     def collideWith(self,intoObject):
         Lx =  intoObject.Px - self.x0
         Ly =  intoObject.Py - self.y0
@@ -27,6 +29,7 @@ class Wall:
             AbsFy = K*(r0-d)*self.dx
             intoObject.addForce(AbsFx,AbsFy,0.0)     
 
+# WallSegment class, finite wall robot can collide with
 class WallSegment(Wall):
     def __init__(self, x0, y0, dx, dy):
         Wall.__init__(self, x0, y0, dx , dy)
@@ -34,6 +37,7 @@ class WallSegment(Wall):
         self.x1 = x0+dx
         self.y1 = y0+dy
 
+    # check if object collides with wall and add force to object
     def collideWith(self,intoObject):
         Lx =  intoObject.Px - self.x0
         Ly =  intoObject.Py - self.y0
@@ -67,6 +71,7 @@ class WallSegment(Wall):
                 AbsFy = K*(r0-dX1)*Ly1/dX1
                 intoObject.addForce(AbsFx,AbsFy,0.0)
 
+# Goal class, a goal made of walls robot can collide with
 class Goal:
     def __init__(self, x0, y0, x1, y1):
         goaldir = sign(x1-x0)
@@ -77,11 +82,13 @@ class Goal:
         self.x0, self.y0 = x0, y0
         self.x1, self.y1 = x1, y1
 
+    # check if goal collides with object and add force to object
     def collideWith(self,intoObject):
         self.wall1.collideWith(intoObject)
         self.wall2.collideWith(intoObject)
         self.wall3.collideWith(intoObject)
 
+    # check if object is inside goal
     def isInside(self, object):
         if ((object.Px >= min(self.x0,self.x1)) and
             (object.Px <= max(self.x0,self.x1)) and
@@ -90,6 +97,7 @@ class Goal:
             return True
         return False
 
+# KineticObject class, a physical object with mass, size, position, velocity, acceleration, force, torque
 class KineticObject:
     def __init__(self, imass, isize):
 
@@ -116,6 +124,7 @@ class KineticObject:
     def applyTorque(self, torque):
         self.Tz = torque
 
+    # add torque to object
     def addTorque(self, torque):
         self.Tz += torque
 
@@ -163,6 +172,7 @@ class KineticObject:
         self.Fx = 0.0
         self.Fy = 0.0
 
+# KineticCylinder class, a cylinder with mass, size, position, velocity, acceleration, force, torque
 class KineticCylinder(KineticObject):
     def __init__(self, imass, isize):
         KineticObject.__init__(self, imass, isize)
@@ -171,6 +181,7 @@ class KineticCylinder(KineticObject):
         self.diametre = isize
         self.Ic = 0.5 * self.mass * ( self.diametre / 2.0 ) * ( self.diametre / 2.0 )
 
+# Ball class, a ball with mass, size, position, velocity, acceleration, force, torque
 class Ball(KineticObject):
     def __init__(self, x0, y0):
         self.radius = 3.5/100.0
@@ -226,6 +237,7 @@ class Ball(KineticObject):
         KineticObject.update(self,dt)
         self.autoReset()
 
+    # reset ball if it is not moving
     def autoReset(self):
         reset = False
         ep=0.005
@@ -252,13 +264,16 @@ class Ball(KineticObject):
             reset = True
         if self.AvgPy + self.radius > 1.82/2.-ep:
             reset = True
+
         if reset:
             self.reset(sign(self.Py))
 
+    # reset ball to initial position
     def reset(self,loc):
         KineticObject.reset(self)
         self.Py = loc*2.43/8
 
+# Wheel class, a wheel with mass, size, position, velocity, acceleration, force, torque
 class Wheel(KineticCylinder):
     def __init__(self,radius):
         KineticCylinder.__init__(self, 0.05, radius*2.0)
